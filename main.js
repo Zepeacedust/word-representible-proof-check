@@ -3,6 +3,10 @@ let proof_box = document.getElementById("proofBox");
 
 let ignorable = [" ", ",", "\n"]
 
+let numbers = ["0","1","2","3","4","5","6","7","8","9"]
+
+
+
 
 const Graph = class {
     constructor(vertices) {
@@ -28,43 +32,55 @@ const Edge = class {
 
 
 function skipWhitespace(text, at) {
-    while (text)
+    while (text[at] in ignorable) {
+        at++;
+    }
+    return at;
 }
 
 function parseNumber(text, at) {
-    while (text[at] in ignorable) {
+    at = skipWhitespace(text, at);
+    let acc = "";
+    if (! (text[at] in numbers)) {throw new Error("Parsing error at " + at + ", expecting number.")}
+    while (text[at] in numbers) {
+        acc += text[at];
         at += 1;
     }
+    return [Number(acc), at];
+}
+
+function parseOrientation(text, at) {
+    at = skipWhitespace(text, at);
+    if (text[at] == "") {return [true, at+1]}
+    if (text[at] == "-") {
+        if (text[at+1] == ">") { return [true,at+2] }
+        else { return [false, at+1]}
+    }
+
 }
 
 function parseEdge(text, at) {
+    let num1, num2;
+    console.log("Eitthvað silly")
     at = skipWhitespace(text, at);
-}
-
-function parseEdge(edge_text) {
-    let oriented = false;
-    let secondStart = 0;
-    let mid = edge_text.indexOf("-");
-    if (mid != -1){
-        secondStart = mid+1;
-        if (edge_text[mid+1] == ">") {
-            oriented = true;
-            secondStart = mid+2;
-        }
-    } else {
-        mid = edge_text.indexOf("→");
-        secondStart = mid+1;
-    }
-    return new Edge(
-        Number(edge_text.slice(0,mid)),
-        Number(edge_text.slice(secondStart, edge_text.length)),
-        oriented
-    );
+    [num1, at] = parseNumber(text, at);
+    [oriented, at] = parseOrientation(text, at);
+    [num2, at] = parseNumber(text, at);
+    console.log("found edge")
+    return [new Edge(num1, num2, oriented), at]
 }
 
 function parseGraph(graph_text) {
-    let lines = graph_text.split("\n");
-    let edges = lines.map(parseEdge);
+
+    let e = null;
+    let edges = [];
+    let at = 0;
+    while (at < graph_text.length) {
+        console.log("Looking for edge")
+        [e, at] = parseEdge(graph_text, at);
+        edges.append(e);
+    }
+
     let vertex_count = Math.max(...edges.map(e => Math.max(e.a, e.b)));
 
     let out_graph = new Graph(vertex_count);
