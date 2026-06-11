@@ -10,14 +10,15 @@ const opCode = {
     MOVE	: 1,
     ORIENT1	: 2,
     ORIENT2	: 3,
-    SHORTCUT	: 4
+    SHORTCUT	: 4,
+    ASSUME      : 5
 }
 
 const edgeType = {
     MISSING : 0,
     UNORIENTED : 1,
     ALONG : 2,
-    AGAINST : 3    
+    AGAINST : 3,
 }
 
 const Graph = class {
@@ -235,6 +236,10 @@ function parseOperation(text, at) {
 	console.log("Found shortcut at " + at)
 	return [new Operation(opCode.SHORTCUT, {"c":c}), at];
     default:
+	if (numbers.includes(text[at])) {
+	    [e, at] = parseEdge(text, at);
+	    return [new Operation(opCode.ASSUME, {"e":e}), at];
+	}
 	console.log(text[at])
 	throw new Error("Something went horribly wrong around " + at + ".")
     }
@@ -331,6 +336,9 @@ function applyOperation(operation) {
 	}
 	graphs[current_graph].complete=true;
 	return;
+    case opCode.ASSUME:
+	graphs[current_graph].insertEdge(operation.inputs["e"])
+	
     }
 }
 
