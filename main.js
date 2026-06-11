@@ -13,6 +13,13 @@ const opCode = {
     SHORTCUT	: 4
 }
 
+const edgeType = {
+    MISSING : 0,
+    UNORIENTED : 1,
+    ALONG : 2,
+    AGAINST : 3    
+}
+
 const Graph = class {
     constructor(vertices) {
         this.inner =  Array(vertices).fill().map(() => Array(vertices).fill(0));
@@ -22,7 +29,9 @@ const Graph = class {
         this.inner[edge.a-1][edge.b-1] = 1;
         if (!edge.oriented) {
             this.inner[edge.b-1][edge.a-1] = 1;
-        }
+        } else {
+            this.inner[edge.b-1][edge.a-1] = 0;	    
+	}
     }
     copy() {
 	let g = new Graph(this.inner.length);
@@ -32,6 +41,17 @@ const Graph = class {
 	    }
 	}
 	return g;
+    }
+    check(a,b) {
+	return [
+	    edgeType.MISSING,   // 0,0
+	    edgeType.AGAINST,   // 0,1
+	    edgeType.ALONG,     // 1,0
+	    edgeType.UNORIENTED // 1,1
+	][2 * this.inner[a-1][b-1] + this.inner[b-1][a-1]]
+    }
+    verifyCycle(c) {
+	
     }
 }
 
@@ -125,6 +145,7 @@ function parseGraph(graph_text) {
     let vertex_count = Math.max(...edges.map(e => Math.max(e.a, e.b)));
     let out_graph = new Graph(vertex_count);
     edges.forEach((e) => out_graph.insertEdge(e))
+    return out_graph;
 }
 
 function parseOperation(text, at) {
@@ -205,24 +226,103 @@ function parseProof(proof_text) {
 	[_, at] = optParseString(proof_text, at, ".");
 	[step, at] = parseOperation(proof_text, at);
 	at = skipWhitespace(proof_text, at);
-	steps.push(step)
+	steps.push(step);
     }
-    console.log(steps)
+    return steps;
 }
 
 let proof_steps = []; 
 let graphs = [];
+let current_graph = 0;
+
 function parse() {
     let graph_text = graphBox.value;
-    graph = parseGraph(graph_text);
+    graphs = [parseGraph(graph_text)];
     let proof_text = proofBox.value;
     proof_steps = parseProof(proof_text);
     
 }
 
 
+function applyOperation(operation) {
+    let unoriented = 0, along=0, against=0, c, e, e1, e2, dest;
+    
+    switch (operation.opcode) {
+    case opCode.BRANCH:
+	graphs.push(graphs[current_graph].copy())
+	graphs[current_graph].insertEdge(operation.inputs["e"]);
+	return;
+    case opCode.MOVE:
+	current_graph = operation.inputs["dest"] - 1
+	graphs[current_graph].insertEdge(operation.inputs["e"]);
+	return
+    case opCode.ORIENT1:
+	c = operation.inputs["c"];
+	graphs[current_graph].verifyCycle(c);
+	for (let i = 0; i+1<c.length; i++) {
+	    switch (graphs[current_graph].check(c[i], c[i+1])) {
+	    case edgeType.UNORIENTED:
+		unoriented++;
+		break;
+	    case edgeType.ALONG:
+		along++;
+		break;
+	    case edgeType.AGAINST:
+		against++;
+		break;
+	    }
+	}
+	graphs[current_graph].insertEdge(operation.inputs["e"])
+	return;
+    case opCode.ORIENT2:
+	c = operation.inputs["c"];
+	e1 = operation.inputs["e1"];
+	e2 = operation.inputs["e2"];
+
+	graphs[current_graph].verifyCycle(c);
+	for (let i = 0; i+1<c.length; i++) {
+	    switch (graphs[current_graph].check(c[i], c[i+1])) {
+	    case edgeType.UNORIENTED:
+		unoriented++;
+		break;
+	    case edgeType.ALONG:
+		along++;
+		break;
+	    case edgeType.AGAINST:
+		against++;
+		break;
+	    }
+	}
+
+	graphs[current_graph].insertEdge(e1);
+	graphs[current_graph].insertEdge(e2);
+	return;
+    case opCode.SHORTCUT:
+	c = operation.inputs["c"];
+	for (let i = 0; i+1<c.length; i++) {
+	    if (graphs[current_graph].check(c[i], c[i+1]) != edgeType.ALONG) {
+		console.log([c[i], c[i+1], graphs[current_graph].check(c[i], c[i+1])])
+		throw new Error("Shortcut path invalid.");
+	    }
+	}
+	if (graphs[current_graph].check(c[0],c[c.length-1]) != edgeType.ALONG) {
+	    throw new Error("shortcut not real shortcut.");
+	}
+	graphs[current_graph].complete=true;
+	return;
+    }
+}
+
+
 
 function validateProof() {
-    parse()
+    parse();
+    current_graph = 0;
+    for (let i = 0; i<proof_steps.length; i++) {
+	applyOperation(proof_steps[i])
+    }
+    if (graphs.every((g)=>g.complete)) {
+	alert("Proof is correct");
+    }
 }
 
