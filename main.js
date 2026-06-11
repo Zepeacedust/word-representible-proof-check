@@ -53,6 +53,34 @@ const Graph = class {
     verifyCycle(c) {
 	
     }
+    cycleStatus(c) {
+	let unoriented=0, along=0, against = 0;
+	for (let i = 0; i+1<c.length; i++) {
+	    switch (this.check(c[i], c[i+1])) {
+	    case edgeType.UNORIENTED:
+		unoriented++;
+		break;
+	    case edgeType.ALONG:
+		along++;
+		break;
+	    case edgeType.AGAINST:
+		against++;
+		break;
+	    }
+	}
+	switch (this.check(c[c.length-1], c[0])) {
+	case edgeType.UNORIENTED:
+	    unoriented++;
+	    break;
+	case edgeType.ALONG:
+	    along++;
+	    break;
+	case edgeType.AGAINST:
+	    against++;
+	    break;
+	}
+	return [unoriented, along, against]
+    }
 }
 
 const Edge = class {
@@ -259,20 +287,18 @@ function applyOperation(operation) {
     case opCode.ORIENT1:
 	c = operation.inputs["c"];
 	graphs[current_graph].verifyCycle(c);
-	for (let i = 0; i+1<c.length; i++) {
-	    switch (graphs[current_graph].check(c[i], c[i+1])) {
-	    case edgeType.UNORIENTED:
-		unoriented++;
-		break;
-	    case edgeType.ALONG:
-		along++;
-		break;
-	    case edgeType.AGAINST:
-		against++;
-		break;
-	    }
+	[unoriented, along, against] = graphs[current_graph].cycleStatus(c);
+	if (unoriented != 1) {
+	    throw new Error("Trying to orient one edge in cycle that does not have exactly one unoriented edge, it has " + unoriented + ".")
 	}
-	graphs[current_graph].insertEdge(operation.inputs["e"])
+	if (along != 1 && against != 1) {
+	    throw new Error("Cycle does not satisfy precondition of lemma 1.")
+	}
+	graphs[current_graph].insertEdge(operation.inputs["e"]);
+	[unoriented, along, against] = graphs[current_graph].cycleStatus(c);
+	if (against != 2 && along != 2) {
+	    throw new Error("Addding edge did not result in well-formed cycle.")
+	}
 	return;
     case opCode.ORIENT2:
 	c = operation.inputs["c"];
@@ -280,22 +306,17 @@ function applyOperation(operation) {
 	e2 = operation.inputs["e2"];
 
 	graphs[current_graph].verifyCycle(c);
-	for (let i = 0; i+1<c.length; i++) {
-	    switch (graphs[current_graph].check(c[i], c[i+1])) {
-	    case edgeType.UNORIENTED:
-		unoriented++;
-		break;
-	    case edgeType.ALONG:
-		along++;
-		break;
-	    case edgeType.AGAINST:
-		against++;
-		break;
-	    }
+	[unoriented, along, against] = graphs[current_graph].cycleStatus(c);
+	if (unoriented != 2) {
+	    throw new Error("Trying to orient two edges in cycle that does not have exactly two unoriented edges, it has " + unoriented + ".")
 	}
-
+	
 	graphs[current_graph].insertEdge(e1);
 	graphs[current_graph].insertEdge(e2);
+	[unoriented, along, against] = graphs[current_graph].cycleStatus(c);
+	if (against != 2 && along != 2) {
+	    throw new Error("Addding edge did not result in well-formed cycle.")
+	}
 	return;
     case opCode.SHORTCUT:
 	c = operation.inputs["c"];
